@@ -662,26 +662,24 @@ async function loadTurni(){
 }
 
 async function saveTurni(){
-  if(APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_URL'){
-    showToast('⚠ Apps Script URL non configurato');
-    setDirty(false);
-    return;
-  }
   const btn=document.getElementById('btnSave');
   btn.disabled=true;btn.textContent='Salvataggio...';
   try{
-    const payload={action:'save', data:turniData};
-    await fetch(APPS_SCRIPT_URL,{
-      method:'POST',
-      body:JSON.stringify(payload),
-      headers:{'Content-Type':'application/json'}
+    const weekData={};
+    currentWeekDays.forEach(d=>{
+      const k=dateKey(d);
+      if(turniData[k]) weekData[k]=turniData[k];
     });
+    const url=`${APPS_SCRIPT_URL}?action=save&data=${encodeURIComponent(JSON.stringify(weekData))}`;
+    const res=await fetch(url);
+    const json=await res.json();
     setDirty(false);
     btn.textContent='Salva';
     showToast('✓ Turni salvati');
   } catch(e){
     btn.textContent='Salva';btn.disabled=false;
     showToast('Errore di connessione. Riprova.');
+    console.error(e);
   }
 }
 
