@@ -647,18 +647,30 @@ function showSaveBar(){document.getElementById('saveBar').classList.add('visible
 function hideSaveBar(){document.getElementById('saveBar').classList.remove('visible')}
 
 // ─── JSONP HELPER (aggira CORS) ───────────────────────────────────────────────
-function jsonpRequest(url, callbackName){
+function jsonpRequest(url, callbackName, timeout=20000){
   return new Promise((resolve, reject)=>{
     const script=document.createElement('script');
+    let done=false;
     window[callbackName]=(data)=>{
+      if(done) return; done=true;
       delete window[callbackName];
-      document.body.removeChild(script);
+      try{document.body.removeChild(script);}catch(e){}
       resolve(data);
     };
-    script.src=`${url}&callback=${callbackName}`;
-    script.onerror=()=>{ delete window[callbackName]; try{document.body.removeChild(script);}catch(e){} reject(new Error('JSONP error')); };
+    script.src=`${url}&callback=${callbackName}&t=${Date.now()}`;
+    script.onerror=()=>{
+      if(done) return; done=true;
+      delete window[callbackName];
+      try{document.body.removeChild(script);}catch(e){}
+      reject(new Error('JSONP error'));
+    };
     document.body.appendChild(script);
-    setTimeout(()=>{ if(window[callbackName]){ delete window[callbackName]; try{document.body.removeChild(script);}catch(e){} reject(new Error('Timeout')); } }, 10000);
+    setTimeout(()=>{
+      if(done) return; done=true;
+      delete window[callbackName];
+      try{document.body.removeChild(script);}catch(e){}
+      reject(new Error('Timeout'));
+    }, timeout);
   });
 }
 
@@ -667,7 +679,7 @@ async function loadTurni(){
   try{
     const keys=currentWeekDays.map(dateKey);
     const url=`${APPS_SCRIPT_URL}?action=load&keys=${keys.join(',')}`;
-    const json=await jsonpRequest(url,'_cbLoad'+Date.now());
+    const json=await jsonpRequest(url,'_cbLoad'+Date.now(), 20000);
     if(json.data){
       Object.assign(turniData,json.data);
       renderWeek();
@@ -678,21 +690,37 @@ async function loadTurni(){
 async function saveTurni(){
   const btn=document.getElementById('btnSave');
   btn.disabled=true;btn.textContent='Salvataggio...';
+  
+  // Salva un giorno alla volta per evitare URL troppo lunghi
   try{
     const weekData={};
     currentWeekDays.forEach(d=>{
       const k=dateKey(d);
       if(turniData[k]) weekData[k]=turniData[k];
     });
-    const url=`${APPS_SCRIPT_URL}?action=save&data=${encodeURIComponent(JSON.stringify(weekData))}`;
-    await jsonpRequest(url,'_cbSave'+Date.now());
+    
+    // Dividi in chunks da 2 giorni
+    const keys=Object.keys(weekData);
+    const chunks=[];
+    for(let i=0;i<keys.length;i+=2){
+      const chunk={};
+      keys.slice(i,i+2).forEach(k=>chunk[k]=weekData[k]);
+      chunks.push(chunk);
+    }
+    
+    for(const chunk of chunks){
+      const dataStr=JSON.stringify(chunk);
+      const url=`${APPS_SCRIPT_URL}?action=save&data=${encodeURIComponent(dataStr)}`;
+      await jsonpRequest(url,'_cbSave'+Date.now(), 25000);
+    }
+    
     setDirty(false);
     btn.textContent='Salva';
     showToast('✓ Turni salvati');
   } catch(e){
     btn.textContent='Salva';btn.disabled=false;
-    showToast('Errore di connessione. Riprova.');
-    console.error(e);
+    showToast('Errore. Riprova tra qualche secondo.');
+    console.error('Save error:',e);
   }
 }
 
