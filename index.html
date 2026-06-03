@@ -429,7 +429,7 @@ function changeWeek(dir){
   currentWeekDays=getCurrentWeekDays();
   updateWeekHeader();
   renderWeek();
-  if(APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_URL') loadTurni();
+  loadTurni();
 }
 
 // ─── RENDER ──────────────────────────────────────────────────────────────────
@@ -729,13 +729,8 @@ function init(){
   currentWeekDays=getCurrentWeekDays();
   updateWeekHeader();
   renderWeek();
-
-  // Carica da Sheets se URL configurato
-  if(APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_URL'){
-    loadTurni().finally(hideLoading);
-  } else {
-    setTimeout(hideLoading,600);
-  }
+  // Carica sempre da Sheets
+  loadTurni().finally(hideLoading);
 }
 
 function hideLoading(){
