@@ -355,7 +355,7 @@ body{
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRYfjT_nxEuTf6dqzx40b-f3HOC8PwsL8jgXOtKcCbdvqjaToCsS1pvUn9QKUKjARg/exec'; // sostituire dopo il deploy
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbygcvsBqxeLG9-RQz3otSkdwJzL-vYcCVWVTTIipCkV2DddfaCARoVNuA07gDbfsguk/exec'; // sostituire dopo il deploy
 const ADMIN_PASSWORD  = 'chalet2026';
 
 const STAFF = ['VALERIO','CONCETTA','SERENA','ANNA','JERRY','EMILIO',
@@ -646,14 +646,28 @@ function setDirty(v){
 function showSaveBar(){document.getElementById('saveBar').classList.add('visible')}
 function hideSaveBar(){document.getElementById('saveBar').classList.remove('visible')}
 
+// ─── JSONP HELPER (aggira CORS) ───────────────────────────────────────────────
+function jsonpRequest(url, callbackName){
+  return new Promise((resolve, reject)=>{
+    const script=document.createElement('script');
+    window[callbackName]=(data)=>{
+      delete window[callbackName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+    script.src=`${url}&callback=${callbackName}`;
+    script.onerror=()=>{ delete window[callbackName]; try{document.body.removeChild(script);}catch(e){} reject(new Error('JSONP error')); };
+    document.body.appendChild(script);
+    setTimeout(()=>{ if(window[callbackName]){ delete window[callbackName]; try{document.body.removeChild(script);}catch(e){} reject(new Error('Timeout')); } }, 10000);
+  });
+}
+
 // ─── GOOGLE SHEETS SYNC ───────────────────────────────────────────────────────
 async function loadTurni(){
-  if(APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_URL') return;
   try{
     const keys=currentWeekDays.map(dateKey);
     const url=`${APPS_SCRIPT_URL}?action=load&keys=${keys.join(',')}`;
-    const res=await fetch(url);
-    const json=await res.json();
+    const json=await jsonpRequest(url,'_cbLoad'+Date.now());
     if(json.data){
       Object.assign(turniData,json.data);
       renderWeek();
@@ -671,8 +685,7 @@ async function saveTurni(){
       if(turniData[k]) weekData[k]=turniData[k];
     });
     const url=`${APPS_SCRIPT_URL}?action=save&data=${encodeURIComponent(JSON.stringify(weekData))}`;
-    const res=await fetch(url);
-    const json=await res.json();
+    await jsonpRequest(url,'_cbSave'+Date.now());
     setDirty(false);
     btn.textContent='Salva';
     showToast('✓ Turni salvati');
