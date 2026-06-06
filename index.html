@@ -683,6 +683,17 @@ async function loadTurni(){
     if(json.data){
       Object.assign(turniData,json.data);
       renderWeek();
+      // Apri automaticamente i giorni che hanno almeno un turno
+      currentWeekDays.forEach(d=>{
+        const key=dateKey(d);
+        const dayData=turniData[key];
+        if(!dayData) return;
+        const hasTurni=Object.values(dayData.fasce||{}).some(rows=>rows.some(r=>r.nome));
+        if(hasTurni){
+          const card=document.querySelector(`.day-card[data-key="${key}"]`);
+          if(card) card.classList.add('open');
+        }
+      });
     }
   } catch(e){console.warn('Load error',e)}
 }
